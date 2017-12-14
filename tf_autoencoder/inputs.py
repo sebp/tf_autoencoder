@@ -18,11 +18,12 @@ class IteratorInitializerHook(tf.train.SessionRunHook):
 
 class BaseInputFunction(object, metaclass=ABCMeta):
     @abstractmethod
-    def __init__(self, data, batch_size, mode, scope):
+    def __init__(self, data, batch_size, num_epochs, mode, scope):
         self.data = data
         self.batch_size = batch_size
         self.mode = mode
         self.scope = scope
+        self.num_epochs = num_epochs
         self.init_hook = IteratorInitializerHook()
 
     @abstractmethod
@@ -63,10 +64,10 @@ class BaseInputFunction(object, metaclass=ABCMeta):
             placeholders = self._create_placeholders()
 
             # Build dataset iterator
-            dataset = self._build_dataset(placeholders)
+            dataset = self._build_dataset(placeholders).prefetch(512)
             if self.mode == tf.estimator.ModeKeys.TRAIN:
                 dataset = dataset.shuffle(buffer_size=10000)
-                dataset = dataset.repeat()
+                dataset = dataset.repeat(self.num_epochs)
             dataset = dataset.batch(self.batch_size)
 
             iterator = dataset.make_initializable_iterator()
@@ -96,6 +97,7 @@ class CorruptedInputDecorator(BaseInputFunction):
     def __init__(self, input_function, noise_factor=0.5):
         super().__init__(data=input_function.data,
                          batch_size=input_function.batch_size,
+                         num_epochs=input_function.num_epochs,
                          mode=input_function.mode,
                          scope=input_function.scope)
         self.input_function = input_function
@@ -114,7 +116,8 @@ class CorruptedInputDecorator(BaseInputFunction):
             noise = self.noise_factor * tf.random_normal(x.shape.as_list())
             return tf.clip_by_value(tf.add(x, noise), 0., 1.), y
 
-        return dataset.map(_add_noise)
+        # run mapping function in parallel
+        return dataset.map(_add_noise, num_parallel_calls=4)
 
 
 class MNISTReconstructionInputFunction(BaseInputFunction):
@@ -132,8 +135,9 @@ class MNISTReconstructionInputFunction(BaseInputFunction):
         Name of input function in Tensor board.
     """
 
-    def __init__(self, data, batch_size, mode, scope):
-        super().__init__(data=data, batch_size=batch_size, mode=mode, scope=scope)
+    def __init__(self, data, batch_size, num_epochs, mode, scope):
+        super().__init__(data=data, batch_size=batch_size,
+                         num_epochs=num_epochs, mode=mode, scope=scope)
         self._images_placeholder = None
         self._labels_placeholder = None
 
@@ -167,24 +171,24 @@ class MNISTReconstructionDataset:
         self.noise_factor = noise_factor
         self.feature_columns = tf.feature_column.numeric_column('x', shape=(784,))
 
-    def _input_fn_corrupt(self, data, batch_size, mode, scope):
-        f = MNISTReconstructionInputFunction(data, batch_size,
+    def _input_fn_corrupt(self, data, batch_size, num_epochs, mode, scope):
+        f = MNISTReconstructionInputFunction(data, batch_size, num_epochs,
                                              mode, scope)
         if self.noise_factor > 0:
             return CorruptedInputDecorator(f, noise_factor=self.noise_factor)
         return f
 
-    def get_train_input_fn(self, batch_size):
-        return self._input_fn_corrupt(self.mnist.train.images, batch_size,
+    def get_train_input_fn(self, batch_size, num_epochs):
+        return self._input_fn_corrupt(self.mnist.train.images, batch_size, num_epochs,
                                       tf.estimator.ModeKeys.TRAIN,
                                       'training_data')
 
     def get_eval_input_fn(self, batch_size):
-        return self._input_fn_corrupt(self.mnist.validation.images, batch_size,
+        return self._input_fn_corrupt(self.mnist.validation.images, batch_size, None,
                                       tf.estimator.ModeKeys.EVAL,
                                       'validation_data')
 
     def get_test_input_fn(self, batch_size):
-        return self._input_fn_corrupt(self.mnist.test.images, batch_size,
+        return self._input_fn_corrupt(self.mnist.test.images, batch_size, None,
                                       tf.estimator.ModeKeys.PREDICT,
                                       'test_data')

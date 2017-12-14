@@ -25,8 +25,8 @@ tf.app.flags.DEFINE_integer(
     'batch_size', default_value=256,
     docstring='Batch size')
 tf.app.flags.DEFINE_integer(
-    'steps', default_value=5000,
-    docstring='Number of steps to perform for training')
+    'epochs', default_value=50,
+    docstring='Number of epochs to perform for training')
 tf.app.flags.DEFINE_float(
     'weight_decay', default_value=1e-5,
     docstring='Amount of weight decay to apply')
@@ -38,7 +38,7 @@ tf.app.flags.DEFINE_float(
 def create_experiment(run_config, hparams):
     data = MNISTReconstructionDataset(FLAGS.data_dir,
                                       noise_factor=FLAGS.noise_factor)
-    train_input_fn = data.get_train_input_fn(hparams.batch_size)
+    train_input_fn = data.get_train_input_fn(hparams.batch_size, hparams.num_epochs)
     eval_input_fn = data.get_eval_input_fn(hparams.batch_size)
 
     estimator = AutoEncoder(hidden_units=[128, 64, 32],
@@ -51,7 +51,7 @@ def create_experiment(run_config, hparams):
         estimator=estimator,
         train_input_fn=train_input_fn,
         eval_input_fn=eval_input_fn,
-        train_steps=hparams.train_steps,
+        train_steps=None,  # Use training feeder until its empty
         train_monitors=[train_input_fn.init_hook],  # Hooks for training
         eval_hooks=[eval_input_fn.init_hook],  # Hooks for evaluation
         eval_steps=None,  # Use evaluation feeder until its empty
@@ -67,7 +67,7 @@ def run_train(args=None):
         dropout=FLAGS.dropout,
         weight_decay=FLAGS.weight_decay,
         learning_rate=FLAGS.learning_rate,
-        train_steps=FLAGS.steps,
+        num_epochs=FLAGS.epochs,
         batch_size=FLAGS.batch_size)
 
     # Set the run_config and the directory to save the model and stats
