@@ -59,10 +59,11 @@ def _autoencoder_model_fn(features, labels, hidden_units,
     if mode == tf.estimator.ModeKeys.TRAIN:
         train_op = tf.contrib.layers.optimize_loss(
             loss=total_loss,
+            optimizer="Adam",
             learning_rate=learning_rate,
             learning_rate_decay_fn=lambda lr, gs: tf.train.exponential_decay(lr, gs, 1000, 0.96, staircase=True),
             global_step=tf.train.get_global_step(),
-            optimizer="Adam")
+            summaries=["learning_rate", "global_gradient_norm"])
 
         # Add histograms for trainable variables
         for var in tf.trainable_variables():
