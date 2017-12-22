@@ -53,6 +53,22 @@ def decoder(inputs, hidden_units, dropout, is_training, scope=None):
     return net
 
 
+def autoencoder_arg_scope(activation_fn, dropout, weight_decay, is_training):
+    if weight_decay is None or weight_decay <= 0:
+        weights_regularizer = None
+    else:
+        weights_regularizer = tf.contrib.layers.l2_regularizer(weight_decay)
+
+    with slim.arg_scope([tf.contrib.layers.fully_connected],
+                        weights_initializer=slim.initializers.variance_scaling_initializer(),
+                        weights_regularizer=weights_regularizer,
+                        activation_fn=activation_fn):
+        with slim.arg_scope([slim.dropout],
+                            keep_prob=dropout,
+                            is_training=is_training) as arg_sc:
+            return arg_sc
+
+
 def autoencoder(inputs, hidden_units, activation_fn, dropout, weight_decay, mode, scope=None):
     """Create autoencoder layers
 
@@ -82,16 +98,9 @@ def autoencoder(inputs, hidden_units, activation_fn, dropout, weight_decay, mode
     """
     is_training = mode == tf.estimator.ModeKeys.TRAIN
 
-    if weight_decay is None:
-        weights_regularizer = None
-    else:
-        weights_regularizer = tf.contrib.layers.l2_regularizer(weight_decay)
-
     with tf.variable_scope(scope, 'AutoEnc', [inputs]):
-        with slim.arg_scope([tf.contrib.layers.fully_connected],
-                            weights_initializer=slim.initializers.variance_scaling_initializer(),
-                            weights_regularizer=weights_regularizer,
-                            activation_fn=activation_fn):
+        with slim.arg_scope(
+                autoencoder_arg_scope(activation_fn, dropout, weight_decay, mode)):
             net = encoder(inputs, hidden_units, dropout, is_training)
             n_features = inputs.shape[1].value
             decoder_units = hidden_units[:-1][::-1] + [n_features]
