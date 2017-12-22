@@ -112,9 +112,10 @@ class CorruptedInputDecorator(BaseInputFunction):
     def _build_dataset(self, placeholders):
         dataset = self.input_function._build_dataset(placeholders)
 
-        def _add_noise(x, y):
-            noise = self.noise_factor * tf.random_normal(x.shape.as_list())
-            return tf.clip_by_value(tf.add(x, noise), 0., 1.), y
+        def add_noise(input_img, groundtruth_img):
+            noise = self.noise_factor * tf.random_normal(input_img.shape.as_list())
+            input_corrupted = tf.clip_by_value(tf.add(input_img, noise), 0., 1.)
+            return input_corrupted, groundtruth
 
         # run mapping function in parallel
         return dataset.map(_add_noise, num_parallel_calls=4)
