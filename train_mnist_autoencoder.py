@@ -17,22 +17,22 @@ tf.app.flags.DEFINE_string(
 
 tf.app.flags.DEFINE_float(
     'noise_factor', default_value=0.0,
-    docstring='Amount of noise to add to input')
+    docstring='Amount of noise to add to input (default: 0)')
 tf.app.flags.DEFINE_float(
     'learning_rate', default_value=0.001,
-    docstring='Learning rate')
+    docstring='Learning rate (default: 0.001)')
 tf.app.flags.DEFINE_integer(
     'batch_size', default_value=256,
-    docstring='Batch size')
+    docstring='Batch size (default: 256)')
 tf.app.flags.DEFINE_integer(
     'epochs', default_value=50,
-    docstring='Number of epochs to perform for training')
+    docstring='Number of epochs to perform for training (default: 50)')
 tf.app.flags.DEFINE_float(
     'weight_decay', default_value=1e-5,
-    docstring='Amount of weight decay to apply')
+    docstring='Amount of weight decay to apply (default: 1e-5)')
 tf.app.flags.DEFINE_float(
     'dropout', default_value=None,
-    docstring='The probability that each element is kept in dropout layers')
+    docstring='The probability that each element is kept in dropout layers (default: 1)')
 
 
 def create_experiment(run_config, hparams):

@@ -19,10 +19,10 @@ tf.app.flags.DEFINE_string(
 
 tf.app.flags.DEFINE_float(
     'noise_factor', default_value=0.0,
-    docstring='Amount of noise to add to input')
+    docstring='Amount of noise to add to input (default: 0)')
 tf.app.flags.DEFINE_integer(
     'images', default_value=10,
-    docstring='Number of test images to reconstruct')
+    docstring='Number of test images to reconstruct (default: 10)')
 
 
 def run_test(args=None):
