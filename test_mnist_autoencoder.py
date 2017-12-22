@@ -20,6 +20,9 @@ tf.app.flags.DEFINE_string(
 tf.app.flags.DEFINE_float(
     'noise_factor', default_value=0.0,
     docstring='Amount of noise to add to input (default: 0)')
+tf.app.flags.DEFINE_float(
+    'dropout', default_value=None,
+    docstring='The probability that each element is kept in dropout layers (default: 1)')
 tf.app.flags.DEFINE_integer(
     'images', default_value=10,
     docstring='Number of test images to reconstruct (default: 10)')
@@ -29,6 +32,7 @@ def run_test(args=None):
     data = MNISTReconstructionDataset(FLAGS.data_dir, FLAGS.noise_factor)
 
     pred_estimator = AutoEncoder(hidden_units=[128, 64, 32],
+                                 dropout=FLAGS.dropout,
                                  learning_rate=0.001,
                                  model_dir=FLAGS.model_dir)
 
