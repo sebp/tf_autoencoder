@@ -51,7 +51,9 @@ def fc_decoder(inputs, hidden_units, dropout, scope=None):
     return net
 
 
-def autoencoder_arg_scope(activation_fn, dropout, weight_decay, is_training):
+def autoencoder_arg_scope(activation_fn, dropout, weight_decay, data_format, mode):
+    is_training = mode == tf.estimator.ModeKeys.TRAIN
+
     if weight_decay is None or weight_decay <= 0:
         weights_regularizer = None
     else:
@@ -64,8 +66,9 @@ def autoencoder_arg_scope(activation_fn, dropout, weight_decay, is_training):
          slim.arg_scope([slim.dropout],
                         keep_prob=dropout,
                         is_training=is_training),\
-         slim.arg_scope([conv2d_fixed_padding, tf.contrib.layers.conv2d_transpose], kernel_size=3, padding='SAME', data_format='NHWC'), \
-         slim.arg_scope([tf.contrib.layers.max_pool2d], kernel_size=2, data_format='NHWC') as arg_sc:
+         slim.arg_scope([conv2d_fixed_padding, tf.contrib.layers.conv2d_transpose],
+                        kernel_size=3, padding='SAME', data_format=data_format), \
+         slim.arg_scope([tf.contrib.layers.max_pool2d], kernel_size=2, data_format=data_format) as arg_sc:
         return arg_sc
 
 
@@ -98,7 +101,7 @@ def fully_connected_autoencoder(inputs, hidden_units, activation_fn, dropout, we
     """
     with tf.variable_scope(scope, 'FCAutoEnc', [inputs]):
         with slim.arg_scope(
-                autoencoder_arg_scope(activation_fn, dropout, weight_decay, mode)):
+                autoencoder_arg_scope(activation_fn, dropout, weight_decay, None, mode)):
             net = fc_encoder(inputs, hidden_units, dropout)
             n_features = inputs.shape[1].value
             decoder_units = hidden_units[:-1][::-1] + [n_features]
@@ -109,7 +112,7 @@ def fully_connected_autoencoder(inputs, hidden_units, activation_fn, dropout, we
 
 def fixed_padding(inputs, data_format):
     """Pad image with zeros to have even width and height"""
-    h = inputs.shape[1].value
+    h = inputs.shape[2].value
     pad_total = h % 2
     pad_beg = pad_total // 2
     pad_end = pad_total - pad_beg
@@ -137,7 +140,7 @@ def conv2d_fixed_padding(inputs,
                          weights_regularizer=None,
                          scope=None):
     with tf.variable_scope(scope, 'conv2d', [inputs]):
-        h = inputs.shape[1].value
+        h = inputs.shape[2].value
         if h % 2 != 0:
             inputs = fixed_padding(inputs, data_format)
 
@@ -196,7 +199,7 @@ def conv_decoder(inputs, num_filters, output_shape, scope=None):
                     slice_beg.append(0)
                     slice_size.append(-1)
                 else:
-                    assert sin > sout
+                    assert sin > sout, "{} <= {}".format(sin, sout)
                     beg = (sin - sout) // 2
                     slice_beg.append(beg)
                     slice_size.append(sout)
@@ -233,13 +236,21 @@ def convolutional_autoencoder(inputs, num_filters, activation_fn, dropout, weigh
     net : tf.Tensor
         Output of the decoder's reconstruction layer.
     """
+    data_format = "NHWC"
+    if data_format == "NHWC":
+        shape = [-1, 28, 28, 1]
+    elif data_format == "NCHW":
+        shape = [-1, 1, 28, 28]
+    else:
+        raise ValueError("unknown data_format {}".format(data_format))
+
     with tf.variable_scope(scope, 'ConvAutoEnc', [inputs]):
         with slim.arg_scope(
-                autoencoder_arg_scope(activation_fn, dropout, weight_decay, mode)):
+                autoencoder_arg_scope(activation_fn, dropout, weight_decay, data_format, mode)):
 
-            net = tf.reshape(inputs, [-1, 28, 28, 1])
+            net = tf.reshape(inputs, shape)
             net = conv_encoder(net, num_filters)
-            net = conv_decoder(net, num_filters[::-1], [-1, 28, 28, 1])
+            net = conv_decoder(net, num_filters[::-1], shape)
 
             net = tf.reshape(net, [-1, 28 * 28])
 
