@@ -1,28 +1,17 @@
 import tensorflow as tf
 
-from .layers import autoencoder
+from .layers import fully_connected_autoencoder, convolutional_autoencoder
 
 
-def _autoencoder_model_fn(features, labels, hidden_units,
-                          activation_fn, dropout, weight_decay, learning_rate, mode):
-    """Construct autoencoder model
+def _create_estimator_spec_from_logits(labels, logits, learning_rate, mode):
+    """Add loss function and create estimator spec.
 
     Parameters
     ----------
-    features : tf.Tensor
-        Tensor holding the input data.
     labels : tf.Tensor
         Tenor holding the data to reconstruct.
-    hidden_units : list of int
-        Number of unites in each hidden layer.
-    activation_fn : callable|None
-        Activation function to use.
-    dropout : float|None
-         Percentage of nodes to remain activate in each layer,
-         or `None` to disable dropout.
-    weight_decay : float|None
-        Amount of regularization to use on the weights
-        (excludes biases).
+    logits : tf.Tensor
+        Tenor holding the reconstructed data.
     learning_rate : float
         Learning rate.
     mode : tf.estimator.ModeKeys
@@ -34,15 +23,6 @@ def _autoencoder_model_fn(features, labels, hidden_units,
         Specification of the model.
     """
     is_training = mode == tf.estimator.ModeKeys.TRAIN
-
-    # Define model's architecture
-    logits = autoencoder(inputs=features,
-                         hidden_units=hidden_units,
-                         activation_fn=activation_fn,
-                         dropout=dropout,
-                         weight_decay=weight_decay,
-                         mode=mode)
-
     probs = tf.nn.sigmoid(logits)
 
     predictions = {"prediction": probs}
@@ -85,12 +65,12 @@ def _autoencoder_model_fn(features, labels, hidden_units,
 
 
 class AutoEncoder(tf.estimator.Estimator):
-    """A Autoencoder estimator.
+    """An Autoencoder estimator with fully connected layers.
 
     Parameters
     ----------
     hidden_units : list of int
-        Number of unites in each hidden layer.
+        Number of units in each hidden layer.
     activation_fn : callable|None
         Activation function to use.
     dropout : float|None
@@ -111,17 +91,66 @@ class AutoEncoder(tf.estimator.Estimator):
     def __init__(self, hidden_units, activation_fn=tf.nn.relu,
                  dropout=None, weight_decay=1e-5, learning_rate=0.001, model_dir=None, config=None):
         def _model_fn(features, labels, mode):
-            return _autoencoder_model_fn(
-                features=features,
+            # Define model's architecture
+            logits = fully_connected_autoencoder(inputs=features,
+                                                 hidden_units=hidden_units,
+                                                 activation_fn=activation_fn,
+                                                 dropout=dropout,
+                                                 weight_decay=weight_decay,
+                                                 mode=mode)
+            return _create_estimator_spec_from_logits(
                 labels=labels,
-                hidden_units=hidden_units,
-                activation_fn=activation_fn,
-                dropout=dropout,
-                weight_decay=weight_decay,
+                logits=logits,
                 learning_rate=learning_rate,
                 mode=mode)
 
         super(AutoEncoder, self).__init__(
+            model_fn=_model_fn,
+            model_dir=model_dir,
+            config=config)
+
+
+class ConvolutionalAutoencoder(tf.estimator.Estimator):
+    """An Autoencoder estimator with 2D convolutions.
+
+    Parameters
+    ----------
+    num_filters : list of int
+        Number of filters in each convolutional block.
+    activation_fn : callable|None
+        Activation function to use.
+    dropout : float|None
+         Percentage of nodes to remain activate in each layer,
+         or `None` to disable dropout.
+    weight_decay : float|None
+        Amount of regularization to use on the weights
+        (excludes biases).
+    learning_rate : float
+        Learning rate.
+    model_dir : str
+        Directory where outputs (checkpoints, event files, etc.)
+        are written to.
+    config : RunConfig
+        Information about the execution environment.
+    """
+
+    def __init__(self, num_filters, activation_fn=tf.nn.relu,
+                 dropout=None, weight_decay=1e-5, learning_rate=0.001, model_dir=None, config=None):
+        def _model_fn(features, labels, mode):
+            # Define model's architecture
+            logits = convolutional_autoencoder(inputs=features,
+                                               num_filters=num_filters,
+                                               activation_fn=activation_fn,
+                                               dropout=dropout,
+                                               weight_decay=weight_decay,
+                                               mode=mode)
+            return _create_estimator_spec_from_logits(
+                labels=labels,
+                logits=logits,
+                learning_rate=learning_rate,
+                mode=mode)
+
+        super(ConvolutionalAutoencoder, self).__init__(
             model_fn=_model_fn,
             model_dir=model_dir,
             config=config)
