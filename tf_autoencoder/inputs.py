@@ -64,11 +64,11 @@ class BaseInputFunction(object, metaclass=ABCMeta):
             placeholders = self._create_placeholders()
 
             # Build dataset iterator
-            dataset = self._build_dataset(placeholders).prefetch(512)
+            dataset = self._build_dataset(placeholders)
             if self.mode == tf.estimator.ModeKeys.TRAIN:
                 dataset = dataset.shuffle(buffer_size=10000)
                 dataset = dataset.repeat(self.num_epochs)
-            dataset = dataset.batch(self.batch_size)
+            dataset = dataset.batch(self.batch_size).prefetch(2)
 
             iterator = dataset.make_initializable_iterator()
             next_example, next_label = iterator.get_next()
