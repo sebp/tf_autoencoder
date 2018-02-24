@@ -68,7 +68,12 @@ class BaseInputFunction(object, metaclass=ABCMeta):
             if self.mode == tf.estimator.ModeKeys.TRAIN:
                 dataset = dataset.shuffle(buffer_size=10000)
                 dataset = dataset.repeat(self.num_epochs)
-            dataset = dataset.batch(self.batch_size).prefetch(2)
+            dataset = dataset.batch(self.batch_size)
+            if self.mode == tf.estimator.ModeKeys.TRAIN:
+                # skip partial batches
+                dataset = dataset.filter(
+                    lambda x, y: tf.equal(tf.shape(x)[0], self.batch_size))
+            dataset = dataset.prefetch(2)
 
             iterator = dataset.make_initializable_iterator()
             next_example, next_label = iterator.get_next()
