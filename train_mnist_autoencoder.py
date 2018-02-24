@@ -1,6 +1,7 @@
 import tensorflow as tf
 
 from tf_autoencoder.cli import create_train_parser
+from tf_autoencoder.hooks import SaveReconstructionListener
 from tf_autoencoder.inputs import MNISTReconstructionDataset
 from tf_autoencoder.estimator import AutoEncoder, ConvolutionalAutoencoder
 
@@ -37,12 +38,26 @@ def create_experiment(run_config, hparams):
     else:
         raise ValueError('unknown model {}'.format(hparams.model))
 
+    if hparams.save_images is None:
+        listeners = None
+    else:
+        recon_input_fn = data.get_eval_input_fn(10)
+        listeners = [
+            SaveReconstructionListener(
+                estimator, recon_input_fn, hparams.save_images)
+        ]
+
+    saver_hook = tf.train.CheckpointSaverHook(
+        estimator._model_dir,
+        save_steps=data.mnist.train.num_examples // hparams.batch_size,
+        listeners=listeners)
+
     experiment = tf.contrib.learn.Experiment(
         estimator=estimator,
         train_input_fn=train_input_fn,
         eval_input_fn=eval_input_fn,
         train_steps=None,  # Use training feeder until its empty
-        train_monitors=[train_input_fn.init_hook],  # Hooks for training
+        train_monitors=[train_input_fn.init_hook, saver_hook],  # Hooks for training
         eval_hooks=[eval_input_fn.init_hook],  # Hooks for evaluation
         eval_steps=None,  # Use evaluation feeder until its empty
         checkpoint_and_export=True
@@ -59,6 +74,7 @@ def run_train(args=None):
     params = tf.contrib.training.HParams(
         model=args.model,
         data_dir=args.data_dir,
+        save_images=args.save_images,
         noise_factor=args.noise_factor,
         dropout=args.dropout,
         weight_decay=args.weight_decay,

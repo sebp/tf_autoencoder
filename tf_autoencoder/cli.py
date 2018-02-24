@@ -83,6 +83,9 @@ class ParserCreator:
         parser.add_argument(
             '--weight_decay', type=float, default=1e-5,
             help='Amount of weight decay to apply (default: 1e-5)')
+        parser.add_argument(
+            '--save_images',
+            help='Path to directory to store intermediate reconstructed images (default: disabled)')
         return self
 
     def add_test_arguments(self):
