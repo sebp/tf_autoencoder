@@ -1,51 +1,41 @@
 import tensorflow as tf
 
+from tf_autoencoder.cli import create_train_parser
 from tf_autoencoder.inputs import MNISTReconstructionDataset
-from tf_autoencoder.estimator import AutoEncoder
+from tf_autoencoder.estimator import AutoEncoder, ConvolutionalAutoencoder
 
 # Show debugging output
 tf.logging.set_verbosity(tf.logging.INFO)
 
-# Set default flags for the output directories
-FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_string(
-    'model_dir', default_value='./mnist_training',
-    docstring='Output directory for model and training stats.')
-tf.app.flags.DEFINE_string(
-    'data_dir', default_value='./mnist_data',
-    docstring='Directory to download the data to.')
 
-tf.app.flags.DEFINE_float(
-    'noise_factor', default_value=0.0,
-    docstring='Amount of noise to add to input (default: 0)')
-tf.app.flags.DEFINE_float(
-    'learning_rate', default_value=0.001,
-    docstring='Learning rate (default: 0.001)')
-tf.app.flags.DEFINE_integer(
-    'batch_size', default_value=256,
-    docstring='Batch size (default: 256)')
-tf.app.flags.DEFINE_integer(
-    'epochs', default_value=50,
-    docstring='Number of epochs to perform for training (default: 50)')
-tf.app.flags.DEFINE_float(
-    'weight_decay', default_value=1e-5,
-    docstring='Amount of weight decay to apply (default: 1e-5)')
-tf.app.flags.DEFINE_float(
-    'dropout', default_value=None,
-    docstring='The probability that each element is kept in dropout layers (default: 1)')
+def create_conv_model(run_config, hparams):
+    return ConvolutionalAutoencoder(num_filters=[16, 8, 8],
+                                    dropout=hparams.dropout,
+                                    weight_decay=hparams.weight_decay,
+                                    learning_rate=hparams.learning_rate,
+                                    config=run_config)
+
+
+def create_fc_model(run_config, hparams):
+    return AutoEncoder(hidden_units=[128, 64, 32],
+                       dropout=hparams.dropout,
+                       weight_decay=hparams.weight_decay,
+                       learning_rate=hparams.learning_rate,
+                       config=run_config)
 
 
 def create_experiment(run_config, hparams):
-    data = MNISTReconstructionDataset(FLAGS.data_dir,
-                                      noise_factor=FLAGS.noise_factor)
+    data = MNISTReconstructionDataset(hparams.data_dir,
+                                      noise_factor=hparams.noise_factor)
     train_input_fn = data.get_train_input_fn(hparams.batch_size, hparams.num_epochs)
     eval_input_fn = data.get_eval_input_fn(hparams.batch_size)
 
-    estimator = AutoEncoder(hidden_units=[128, 64, 32],
-                            dropout=hparams.dropout,
-                            weight_decay=hparams.weight_decay,
-                            learning_rate=hparams.learning_rate,
-                            config=run_config)
+    if hparams.model == 'fully_connected':
+        estimator = create_fc_model(run_config, hparams)
+    elif hparams.model == 'convolutional':
+        estimator = create_conv_model(run_config, hparams)
+    else:
+        raise ValueError('unknown model {}'.format(hparams.model))
 
     experiment = tf.contrib.learn.Experiment(
         estimator=estimator,
@@ -62,17 +52,23 @@ def create_experiment(run_config, hparams):
 
 
 def run_train(args=None):
+    parser = create_train_parser()
+    args = parser.parse_args(args=args)
+
     # Define model parameters
     params = tf.contrib.training.HParams(
-        dropout=FLAGS.dropout,
-        weight_decay=FLAGS.weight_decay,
-        learning_rate=FLAGS.learning_rate,
-        num_epochs=FLAGS.epochs,
-        batch_size=FLAGS.batch_size)
+        model=args.model,
+        data_dir=args.data_dir,
+        noise_factor=args.noise_factor,
+        dropout=args.dropout,
+        weight_decay=args.weight_decay,
+        learning_rate=args.learning_rate,
+        num_epochs=args.epochs,
+        batch_size=args.batch_size)
 
     # Set the run_config and the directory to save the model and stats
     run_config = tf.contrib.learn.RunConfig(
-        model_dir=FLAGS.model_dir,
+        model_dir=args.model_dir,
         save_checkpoints_steps=500)
 
     tf.contrib.learn.learn_runner.run(
@@ -88,4 +84,4 @@ if __name__ == '__main__':
     import logging
     logging.getLogger('tensorflow').propagate = False
 
-    tf.app.run(main=run_train)
+    run_train()

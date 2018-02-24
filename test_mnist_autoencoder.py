@@ -2,39 +2,38 @@ import math
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
+from tf_autoencoder.cli import create_test_parser
 from tf_autoencoder.inputs import MNISTReconstructionDataset
-from tf_autoencoder.estimator import AutoEncoder
+from tf_autoencoder.estimator import AutoEncoder, ConvolutionalAutoencoder
 
 # Show debugging output
 tf.logging.set_verbosity(tf.logging.INFO)
 
-# Set default flags for the output directories
-FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_string(
-    'model_dir', default_value='./mnist_training',
-    docstring='Output directory for model and training stats.')
-tf.app.flags.DEFINE_string(
-    'data_dir', default_value='./mnist_data',
-    docstring='Directory to download the data to.')
 
-tf.app.flags.DEFINE_float(
-    'noise_factor', default_value=0.0,
-    docstring='Amount of noise to add to input (default: 0)')
-tf.app.flags.DEFINE_float(
-    'dropout', default_value=None,
-    docstring='The probability that each element is kept in dropout layers (default: 1)')
-tf.app.flags.DEFINE_integer(
-    'images', default_value=10,
-    docstring='Number of test images to reconstruct (default: 10)')
+def create_conv_model(args):
+    return ConvolutionalAutoencoder(num_filters=[16, 8, 8],
+                                    dropout=args.dropout,
+                                    model_dir=args.model_dir)
+
+
+def create_fc_model(args):
+    return AutoEncoder(hidden_units=[128, 64, 32],
+                       dropout=args.dropout,
+                       model_dir=args.model_dir)
 
 
 def run_test(args=None):
-    data = MNISTReconstructionDataset(FLAGS.data_dir, FLAGS.noise_factor)
+    parser = create_test_parser()
+    args = parser.parse_args(args=args)
 
-    pred_estimator = AutoEncoder(hidden_units=[128, 64, 32],
-                                 dropout=FLAGS.dropout,
-                                 learning_rate=0.001,
-                                 model_dir=FLAGS.model_dir)
+    if args.model == 'fully_connected':
+        pred_estimator = create_fc_model(args)
+    elif args.model == 'convolutional':
+        pred_estimator = create_conv_model(args)
+    else:
+        raise ValueError('unknown model {}'.format(args.model))
+
+    data = MNISTReconstructionDataset(args.data_dir, args.noise_factor)
 
     test_input_fn = data.get_test_input_fn(256, )
     with tf.Session() as sess:
@@ -43,9 +42,9 @@ def run_test(args=None):
         corrupt_images = x.eval()
 
     images = data.mnist.test.images
-    n_rows = int(math.ceil(FLAGS.images / 10.))
-    n_images = FLAGS.images
-    is_denoising = FLAGS.noise_factor > 0
+    n_rows = int(math.ceil(args.images / 10.))
+    n_images = args.images
+    is_denoising = args.noise_factor > 0
     factor = 3 if is_denoising else 2
 
     pred_iter = pred_estimator.predict(test_input_fn, hooks=[test_input_fn.init_hook])
@@ -72,4 +71,4 @@ if __name__ == '__main__':
     import logging
     logging.getLogger('tensorflow').propagate = False
 
-    tf.app.run(main=run_test)
+    run_test()
