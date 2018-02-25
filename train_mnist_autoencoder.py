@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 from tf_autoencoder.cli import create_train_parser
-from tf_autoencoder.hooks import SaveReconstructionListener
+from tf_autoencoder.hooks import PrintParameterSummary, SaveReconstructionListener
 from tf_autoencoder.inputs import MNISTReconstructionDataset
 from tf_autoencoder.estimator import AutoEncoder, ConvolutionalAutoencoder
 
@@ -52,12 +52,18 @@ def create_experiment(run_config, hparams):
         save_steps=data.mnist.train.num_examples // hparams.batch_size,
         listeners=listeners)
 
+    train_monitors = [
+        train_input_fn.init_hook,
+        saver_hook,
+        PrintParameterSummary(),
+    ]
+
     experiment = tf.contrib.learn.Experiment(
         estimator=estimator,
         train_input_fn=train_input_fn,
         eval_input_fn=eval_input_fn,
         train_steps=None,  # Use training feeder until its empty
-        train_monitors=[train_input_fn.init_hook, saver_hook],  # Hooks for training
+        train_monitors=train_monitors,  # Hooks for training
         eval_hooks=[eval_input_fn.init_hook],  # Hooks for evaluation
         eval_steps=None,  # Use evaluation feeder until its empty
         checkpoint_and_export=True
