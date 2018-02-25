@@ -94,4 +94,10 @@ class ParserCreator:
         parser.add_argument(
             '--images', type=int, default=10,
             help='Number of test images to reconstruct (default: 10)')
+        parser.add_argument(
+            '--what', choices=['reconstruction', 'embedding'],
+            default='reconstruction',
+            help='Whether to display reconstructed images or '
+                 'create checkpoint with encoder output to visualize '
+                 'in TensorBoard.')
         return self
