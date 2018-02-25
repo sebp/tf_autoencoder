@@ -35,15 +35,17 @@ def run_test(args=None):
 
     data = MNISTReconstructionDataset(args.data_dir, args.noise_factor)
 
-    test_input_fn = data.get_test_input_fn(256, )
-    with tf.Session() as sess:
-        x, y = test_input_fn()
-        test_input_fn.init_hook.after_create_session(sess, None)
-        corrupt_images = x.eval()
-
-    images = data.mnist.test.images
-    n_rows = int(math.ceil(args.images / 10.))
     n_images = args.images
+    test_input_fn = data.get_test_input_fn(n_images)
+    with tf.Graph().as_default():
+        with tf.device("/cpu:0"):
+            x, y = test_input_fn()
+
+        with tf.Session() as sess:
+            test_input_fn.init_hook.after_create_session(sess, None)
+            corrupt_images, images = sess.run([x, y])
+
+    n_rows = int(math.ceil(n_images / 10.))
     is_denoising = args.noise_factor > 0
     factor = 3 if is_denoising else 2
 
