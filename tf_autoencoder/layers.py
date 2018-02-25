@@ -22,6 +22,7 @@ def fc_encoder(inputs, hidden_units, dropout, scope=None):
                 if dropout is not None:
                     net = slim.dropout(net)
                 add_hidden_layer_summary(net)
+        net = tf.identity(net, name='output')
 
     return net
 
@@ -48,6 +49,7 @@ def fc_decoder(inputs, hidden_units, dropout, scope=None):
                                                     activation_fn=None,
                                                     scope=layer_scope)
             tf.summary.histogram('activation', net)
+        net = tf.identity(net, name='output')
     return net
 
 
@@ -171,6 +173,7 @@ def conv_encoder(inputs, num_filters, scope=None):
                 net = slim.repeat(net, 2, conv2d_fixed_padding, num_outputs=num_outputs)
                 net = tf.contrib.layers.max_pool2d(net)
 
+        net = tf.identity(net, name='output')
     return net
 
 
@@ -204,7 +207,8 @@ def conv_decoder(inputs, num_filters, output_shape, scope=None):
                     slice_beg.append(beg)
                     slice_size.append(sout)
 
-            net = tf.slice(net, slice_beg, slice_size, name='output')
+            net = tf.slice(net, slice_beg, slice_size)
+        net = tf.identity(net, name='output')
 
     return net
 
